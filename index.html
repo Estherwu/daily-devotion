@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 🔑 關鍵修復：確保瀏覽器傳遞正確的 Referrer 標頭以解決 YouTube Error 153 -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>每日靈修與禱告</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f7f9fc;
+            color: #333;
+            margin: 0;web
+
+            padding: 20px;
+        }
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        .admin-btn {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            background-color: #2ed573;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background 0.2s;
+        }
+        .admin-btn:hover { background-color: #26af5f; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+
+        /* 1. 日期選擇按鈕列 */
+        .date-bar {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #eee;
+        }
+        .date-btn {
+            flex: 0 0 auto;
+            padding: 10px 14px;
+            background: #f1f3f5;
+            border: 1px solid #dcdde1;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .date-btn:hover { background: #e2e6ea; }
+        .date-btn.active {
+            background: #4a69bd;
+            color: white;
+            border-color: #385293;
+            font-weight: bold;
+        }
+
+        /* 2. YouTube 影片顯示區 */
+        .youtube-section {
+            margin-bottom: 25px;
+            text-align: center;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .youtube-section iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* 3. 欄位內容樣式 */
+        .field-box {
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4a69bd;
+        }
+        .field-title {
+            font-size: 13px;
+            color: #718093;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .field-content {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #2f3640;
+            white-space: pre-wrap;
+        }
+
+        /* 語音按鈕區 */
+        .audio-section {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .speak-btn {
+            background-color: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3);
+            transition: background 0.2s;
+        }
+        .speak-btn:hover { background-color: #5b4bc4; }
+        .speak-btn.stop { background-color: #ff7675; }
+
+        /* Modal 彈跳視窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { margin-top: 0; color: #2c3e50; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555; }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .form-group textarea { height: 80px; resize: vertical; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 5px; font-size: 15px; cursor: pointer; font-weight: bold; }
+        .btn-save { background-color: #2ed573; color: white; }
+        .btn-save:hover { background-color: #26af5f; }
+        .btn-cancel { background-color: #dfe4ea; color: #57606f; }
+        .btn-cancel:hover { background-color: #ced6e0; }
+
+        .loading { text-align: center; padding: 40px; color: #718093; font-size: 16px; }
+        .no-data { text-align: center; padding: 30px; color: #e74c3c; background: #fdf0ed; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button class="admin-btn" onclick="checkPassword()">＋ 加入資料</button>
+    <h2>📖 每日靈修與禱告</h2>
+    
+    <div id="loading" class="loading">正在載入靈修資料，請稍候...</div>
+    
+    <!-- 1. 七天日期選擇列 -->
+    <div id="dateBar" class="date-bar" style="display: none;"></div>
+
+    <!-- 2. YouTube 影片顯示區 (改用直覺穩定的 iframe) -->
+    <div id="youtubeContainer" class="youtube-section" style="display: none;">
+        <div id="ytPlayerWrapper" style="width:100%; height:100%;"></div>
+    </div>
+
+    <!-- 3. 欄位顯示區域 -->
+    <div id="displayArea"></div>
+
+    <!-- 語音朗讀功能區 -->
+    <div id="audioSection" class="audio-section" style="display: none;">
+        <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告 (溫和女聲)</button>
+    </div>
+</div>
+
+<!-- 新增資料子頁面 (Modal) -->
+<div id="adminModal" class="modal">
+    <div class="modal-content">
+        <h3>📝 新增靈修資料</h3>
+        <form id="addDataForm" onsubmit="submitNewData(event)">
+            <div class="form-group">
+                <label>日期 (格式: YYYY-MM-DD)</label>
+                <input type="date" id="inputDate" required>
+            </div>
+            <div class="form-group">
+                <label>文件序號</label>
+                <input type="text" id="inputSerial" placeholder="例如：DEV-2026-101" required>
+            </div>
+            <div class="form-group">
+                <label>聖經經文</label>
+                <textarea id="inputVerse" placeholder="輸入經文內容..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>我們一起禱告</label>
+                <textarea id="inputPrayer" placeholder="輸入禱告內容..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>今日默想</label>
+                <textarea id="inputMeditation" placeholder="輸入默想內容..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>YouTube 連結 (選填)</label>
+                <input type="url" id="inputYoutube" placeholder="https://www.youtube.com/watch?v=...">
+            </div>
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel" onclick="closeModal()">取消</button>
+                <button type="submit" id="saveBtn" class="btn-save">儲存並更新</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 請換成你的 Apps Script 部署網址
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyY5zIp1QK8mPszE-ltIRWVax-k5H_OHUQgi6SF4Ack18rOeXH3ZnJHCnsiuK3GN06D/exec';
+
+    let globalData = [];
+    let currentDateStr = '';
+    let selectedRowData = null;
+
+    function checkPassword() {
+        let pwd = prompt("請輸入管理員密碼以新增資料：");
+        if (pwd === null) return;
+        if (pwd === "BCKH9999") {
+            document.getElementById('adminModal').style.display = 'flex';
+            let today = new Date().toISOString().split('T')[0];
+            document.getElementById('inputDate').value = today;
+        } else {
+            alert("❌ 密碼錯誤，存取被拒絕。");
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('adminModal').style.display = 'none';
+        document.getElementById('addDataForm').reset();
+    }
+
+    async function submitNewData(e) {
+        e.preventDefault();
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = '儲存中...';
+
+        const payload = {
+            date: document.getElementById('inputDate').value,
+            serial: document.getElementById('inputSerial').value,
+            verse: document.getElementById('inputVerse').value,
+            prayer: document.getElementById('inputPrayer').value,
+            meditation: document.getElementById('inputMeditation').value,
+            youtube: document.getElementById('inputYoutube').value
+        };
+
+        try {
+            const response = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('🎉 資料新增成功！');
+                closeModal();
+                init();
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('❌ 儲存失敗，請檢查網路連線。');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '儲存並更新';
+        }
+    }
+
+    function getLast7Days() {
+        let dates = [];
+        for (let i = 6; i >= 0; i--) {
+            let d = new Date();
+            d.setDate(d.getDate() - i);
+            let year = d.getFullYear();
+            let month = ('0' + (d.getMonth() + 1)).slice(-2);
+            let day = ('0' + d.getDate()).slice(-2);
+            dates.push(`${year}-${month}-${day}`);
+        }
+        return dates;
+    }
+
+    async function init() {
+        try {
+            const response = await fetch(WEB_APP_URL);
+            globalData = await response.json();
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dateBar').style.display = 'flex';
+            document.getElementById('audioSection').style.display = 'block';
+
+            renderDateBar();
+        } catch (error) {
+            console.error(error);
+            document.getElementById('loading').innerHTML = '❌ 載入失敗，請檢查網址或網路連線。';
+        }
+    }
+
+    function renderDateBar() {
+        const dateBar = document.getElementById('dateBar');
+        dateBar.innerHTML = '';
+        const last7Days = getLast7Days();
+
+        currentDateStr = last7Days[last7Days.length - 1];
+
+        last7Days.forEach(dateStr => {
+            const btn = document.createElement('button');
+            btn.className = `date-btn ${dateStr === currentDateStr ? 'active' : ''}`;
+            btn.textContent = dateStr;
+            btn.onclick = () => {
+                document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDateStr = dateStr;
+                renderContent(dateStr);
+            };
+            dateBar.appendChild(btn);
+        });
+
+        renderContent(currentDateStr);
+    }
+
+    function renderContent(dateStr) {
+        const displayArea = document.getElementById('displayArea');
+        const ytContainer = document.getElementById('youtubeContainer');
+        const ytWrapper = document.getElementById('ytPlayerWrapper');
+        selectedRowData = globalData.find(row => row.date === dateStr);
+
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            resetSpeakButton();
+        }
+
+        if (!selectedRowData) {
+            displayArea.innerHTML = `<div class="no-data">📅 ${dateStr} 目前沒有對應的靈修內容。您可以點擊右上角「加入資料」新增。</div>`;
+            ytContainer.style.display = 'none';
+            return;
+        }
+
+        ytContainer.style.display = 'flex';
+        const videoId = extractYouTubeID(selectedRowData.youtube);
+        if (videoId) {
+            // 使用帶有 referrerpolicy 的標準 iframe，完全解決 Error 153
+            ytWrapper.innerHTML = `
+                <iframe src="https://www.youtube.com/embed/${videoId}" 
+                        referrerpolicy="strict-origin-when-cross-origin" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen>
+                </iframe>`;
+        } else {
+            ytWrapper.innerHTML = '<div class="no-data" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#222; color:#aaa;">今日無 YouTube 影片</div>';
+        }
+
+        displayArea.innerHTML = `
+            <div class="field-box">
+                <div class="field-title">聖經經文</div>
+                <div class="field-content">${selectedRowData.verse || '無'}</div>
+            </div>
+            <div class="field-box">
+                <div class="field-title">我們一起禱告</div>
+                <div class="field-content">${selectedRowData.prayer || '無'}</div>
+            </div>
+            <div class="field-box">
+                <div class="field-title">今日默想</div>
+                <div class="field-content">${selectedRowData.meditation || '無'}</div>
+            </div>
+        `;
+    }
+
+    function extractYouTubeID(url) {
+        if (!url) return null;
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    // 溫和女聲 TTS 朗讀
+    const synth = window.speechSynthesis;
+    let voices = [];
+
+    function loadVoices() { voices = synth.getVoices(); }
+    loadVoices();
+    if (synth.onvoiceschanged !== undefined) { synth.onvoiceschanged = loadVoices; }
+
+    function toggleSpeech() {
+        const btn = document.getElementById('speakBtn');
+
+        if (synth.speaking) {
+            synth.cancel();
+            resetSpeakButton();
+            return;
+        }
+
+        if (!selectedRowData) return;
+
+        const textToSpeak = `
+            聖經經文：${selectedRowData.verse}。
+            我們一起禱告：${selectedRowData.prayer}。
+            今日默想：${selectedRowData.meditation}。
+        `;
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        let targetVoice = voices.find(v => v.lang.includes('zh') && (v.name.includes('Yating') || v.name.includes('Yaoyao') || v.name.includes('Meijia') || v.name.includes('Xiaoxiao')));
+        if (!targetVoice) { targetVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn')); }
+        if (targetVoice) { utterance.voice = targetVoice; }
+
+        utterance.rate = 0.55;
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => {
+            btn.textContent = '⏹ 停止朗讀';
+            btn.classList.add('stop');
+        };
+        utterance.onend = () => { resetSpeakButton(); };
+        utterance.onerror = () => { resetSpeakButton(); };
+
+        synth.speak(utterance);
+    }
+
+    function resetSpeakButton() {
+        const btn = document.getElementById('speakBtn');
+        btn.textContent = '🔊 朗讀經文與禱告)';
+        btn.classList.remove('stop');
+    }
+
+    init();
+</script>
+
+</body>
+</html>
