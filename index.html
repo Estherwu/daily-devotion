@@ -436,7 +436,7 @@
         `;
 
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        let targetVoice = voices.find(v => v.lang.includes('Xiaoxiao') && (v.name.includes('Yating') || v.name.includes('Ting-Ting') || v.name.includes('Mei-Jia') || v.name.includes('Xiaoxiao')));
+        let targetVoice = voices.find(v => v.lang.includes('zh-CN') && (v.name.includes('Yating') || v.name.includes('Ting-Ting') || v.name.includes('Mei-Jia') || v.name.includes('Xiaoxiao')));
         if (!targetVoice) { targetVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn')); }
         if (targetVoice) { utterance.voice = targetVoice; }
 
