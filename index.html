@@ -200,7 +200,7 @@
 
     <!-- 語音朗讀功能區 -->
     <div id="audioSection" class="audio-section" style="display: none;">
-        <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告 (溫和女聲)</button>
+        <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告</button>
     </div>
 </div>
 
@@ -437,29 +437,23 @@
 
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
         let targetVoice = null;
-
         // 1. 如果在 Windows，優先尋找 Yating 或 Xiaoxiao
         targetVoice = voices.find(v => v.name.includes('Yating') || v.name.includes('Xiaoxiao'));
-
         // 2. 如果在 Apple 裝置，優先尋找 Mei-Jia
         if (!targetVoice) {
             targetVoice = voices.find(v => v.name.includes('Mei-Jia') || v.name.includes('Meijia'));
         }
-
         // 3. 如果在 Android 手機或其他裝置，鎖定尋找 zh-TW (台灣繁體中文)
         if (!targetVoice) {
             targetVoice = voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW');
         }
-
         // 4. 最後防線：只要是中文即可
         if (!targetVoice) {
             targetVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn'));
         }
-
         if (targetVoice) {
             utterance.voice = targetVoice;
         }
-
         utterance.rate = 0.55;
         utterance.pitch = 1.0;
 
@@ -475,7 +469,7 @@
 
     function resetSpeakButton() {
         const btn = document.getElementById('speakBtn');
-        btn.textContent = '🔊 朗讀經文與禱告)';
+        btn.textContent = '🔊 朗讀經文與禱告';
         btn.classList.remove('stop');
     }
 
