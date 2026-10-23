@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 🔑 關鍵修復：確保瀏覽器傳遞正確的 Referrer 標頭以解決 YouTube Error 153 -->
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>每日靈修與禱告</title>
     <style>
@@ -11,8 +10,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f7f9fc;
             color: #333;
-            margin: 0;web
-
+            margin: 0;
             padding: 20px;
         }
         .container {
@@ -24,11 +22,14 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             position: relative;
         }
-        .admin-btn {
+        .top-btns {
             position: absolute;
             top: 25px;
             right: 30px;
-            background-color: #2ed573;
+            display: flex;
+            gap: 10px;
+        }
+        .action-top-btn {
             color: white;
             border: none;
             padding: 8px 14px;
@@ -39,10 +40,14 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: background 0.2s;
         }
+        .admin-btn { background-color: #2ed573; }
         .admin-btn:hover { background-color: #26af5f; }
+        .prayer-btn { background-color: #ffa502; }
+        .prayer-btn:hover { background-color: #ff9f1a; }
+
         h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
 
-        /* 1. 日期選擇按鈕列 */
+        /* 1. 日期選擇按鈕列 (今天在最左邊) */
         .date-bar {
             display: flex;
             gap: 8px;
@@ -174,6 +179,7 @@
         .btn-save:hover { background-color: #26af5f; }
         .btn-cancel { background-color: #dfe4ea; color: #57606f; }
         .btn-cancel:hover { background-color: #ced6e0; }
+        .form-tip { font-size: 12px; color: #e67e22; margin-top: 4px; display: block; }
 
         .loading { text-align: center; padding: 40px; color: #718093; font-size: 16px; }
         .no-data { text-align: center; padding: 30px; color: #e74c3c; background: #fdf0ed; border-radius: 8px; }
@@ -182,36 +188,37 @@
 <body>
 
 <div class="container">
-    <button class="admin-btn" onclick="checkPassword()">＋ 加入資料</button>
+    <div class="top-btns">
+        <button class="action-top-btn prayer-btn" onclick="openPrayerModal()">🙏 請為我禱告</button>
+        <button class="action-top-btn admin-btn" onclick="checkPassword()">＋ 資料</button>
+    </div>
+
     <h2>📖 每日靈修與禱告</h2>
     
     <div id="loading" class="loading">正在載入靈修資料，請稍候...</div>
     
-    <!-- 1. 七天日期選擇列 -->
     <div id="dateBar" class="date-bar" style="display: none;"></div>
 
-    <!-- 2. YouTube 影片顯示區 (改用直覺穩定的 iframe) -->
     <div id="youtubeContainer" class="youtube-section" style="display: none;">
         <div id="ytPlayerWrapper" style="width:100%; height:100%;"></div>
     </div>
 
-    <!-- 3. 欄位顯示區域 -->
     <div id="displayArea"></div>
 
-    <!-- 語音朗讀功能區 -->
     <div id="audioSection" class="audio-section" style="display: none;">
         <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告</button>
     </div>
 </div>
 
-<!-- 新增資料子頁面 (Modal) -->
+<!-- 管理員 Modal -->
 <div id="adminModal" class="modal">
     <div class="modal-content">
-        <h3>📝 新增靈修資料</h3>
+        <h3>📝 新增或編輯靈修資料</h3>
         <form id="addDataForm" onsubmit="submitNewData(event)">
             <div class="form-group">
-                <label>日期 (格式: YYYY-MM-DD)</label>
-                <input type="date" id="inputDate" required>
+                <label>選擇日期 (欄位 A，唯一)</label>
+                <input type="date" id="inputDate" onchange="checkDateExist()" required>
+                <span id="dateTip" class="form-tip"></span>
             </div>
             <div class="form-group">
                 <label>文件序號</label>
@@ -241,6 +248,38 @@
     </div>
 </div>
 
+<!-- 訪客：請為我代禱 Modal (包含 名字、電話、代禱內容、語音錄音) -->
+<div id="prayerModal" class="modal">
+    <div class="modal-content">
+        <h3>🙏 請為我代禱</h3>
+        <p style="font-size: 13px; color: #666; text-align: center;">歡迎留下您的名字、電話與代禱需求。</p>
+        <form id="prayerForm" onsubmit="submitPrayer(event)">
+            <div class="form-group">
+                <label>名字</label>
+                <input type="text" id="prayerName" placeholder="請輸入您的名字" required>
+            </div>
+            <div class="form-group">
+                <label>電話</label>
+                <input type="tel" id="prayerPhone" placeholder="請輸入您的聯絡電話" required>
+            </div>
+            <div class="form-group">
+                <label>代禱內容</label>
+                <textarea id="prayerTextContent" placeholder="請在此輸入您的代禱需求..." required></textarea>
+            </div>
+            <div class="form-group" style="background: #f1f2f6; padding: 12px; border-radius: 6px; text-align: center;">
+                <label style="margin-bottom: 8px; font-size: 13px;">🎤 語音錄音留言 (選填)</label>
+                <button type="button" id="recordBtn" onclick="toggleRecording()" style="background:#ff4757; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; font-size:14px;">開始錄音</button>
+                <span id="recordStatus" style="font-size: 12px; margin-left: 8px; color:#555;">未錄音</span>
+                <audio id="audioPlayback" controls style="width:100%; margin-top:10px; display:none;"></audio>
+            </div>
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel" onclick="closePrayerModal()">取消</button>
+                <button type="submit" id="prayerSubmitBtn" class="btn-save" style="background-color: #ffa502;">送出代禱</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     // ⚠️ 請換成你的 Apps Script 部署網址
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyY5zIp1QK8mPszE-ltIRWVax-k5H_OHUQgi6SF4Ack18rOeXH3ZnJHCnsiuK3GN06D/exec';
@@ -248,22 +287,52 @@
     let globalData = [];
     let currentDateStr = '';
     let selectedRowData = null;
+    let adminPassword = "";
 
     function checkPassword() {
-        let pwd = prompt("請輸入管理員密碼以新增資料：");
+        let pwd = prompt("請輸入管理員密碼以新增/編輯資料：");
         if (pwd === null) return;
-        if (pwd === "BCKH9999") {
+        
+        if (pwd.trim() !== "") {
+            adminPassword = pwd;
             document.getElementById('adminModal').style.display = 'flex';
+            
             let today = new Date().toISOString().split('T')[0];
             document.getElementById('inputDate').value = today;
+            checkDateExist();
         } else {
-            alert("❌ 密碼錯誤，存取被拒絕。");
+            alert("❌ 請輸入密碼。");
+        }
+    }
+
+    function checkDateExist() {
+        const selectedDate = document.getElementById('inputDate').value;
+        const tipEl = document.getElementById('dateTip');
+        const existingRow = globalData.find(row => row.date === selectedDate);
+        
+        if (existingRow) {
+            tipEl.style.color = '#e67e22';
+            tipEl.textContent = 'ℹ️ 該日期已有資料，修改後儲存將會更新現有內容。';
+            document.getElementById('inputSerial').value = existingRow.serial || '';
+            document.getElementById('inputVerse').value = existingRow.verse || '';
+            document.getElementById('inputPrayer').value = existingRow.prayer || '';
+            document.getElementById('inputMeditation').value = existingRow.meditation || '';
+            document.getElementById('inputYoutube').value = existingRow.youtube || '';
+        } else {
+            tipEl.style.color = '#2ed573';
+            tipEl.textContent = '✨ 該日期尚無資料，將新增一筆新紀錄。';
+            document.getElementById('inputSerial').value = '';
+            document.getElementById('inputVerse').value = '';
+            document.getElementById('inputPrayer').value = '';
+            document.getElementById('inputMeditation').value = '';
+            document.getElementById('inputYoutube').value = '';
         }
     }
 
     function closeModal() {
         document.getElementById('adminModal').style.display = 'none';
         document.getElementById('addDataForm').reset();
+        document.getElementById('dateTip').textContent = '';
     }
 
     async function submitNewData(e) {
@@ -273,6 +342,8 @@
         saveBtn.textContent = '儲存中...';
 
         const payload = {
+            action: "saveDevotion",
+            password: adminPassword,
             date: document.getElementById('inputDate').value,
             serial: document.getElementById('inputSerial').value,
             verse: document.getElementById('inputVerse').value,
@@ -289,11 +360,11 @@
             const result = await response.json();
 
             if (result.status === 'success') {
-                alert('🎉 資料新增成功！');
+                alert('🎉 資料儲存成功！');
                 closeModal();
                 init();
             } else {
-                throw new Error(result.message);
+                alert('❌ 儲存失敗：' + (result.message || '密碼錯誤或系統異常'));
             }
         } catch (error) {
             console.error(error);
@@ -304,9 +375,100 @@
         }
     }
 
+    function openPrayerModal() {
+        document.getElementById('prayerModal').style.display = 'flex';
+    }
+
+    function closePrayerModal() {
+        document.getElementById('prayerModal').style.display = 'none';
+        document.getElementById('prayerForm').reset();
+        document.getElementById('audioPlayback').style.display = 'none';
+        document.getElementById('recordStatus').textContent = '未錄音';
+        if (isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+        }
+    }
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let hasAudioRecorded = false;
+    let isRecording = false;
+
+    async function toggleRecording() {
+        const btn = document.getElementById('recordBtn');
+        const status = document.getElementById('recordStatus');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioPlayback.src = URL.createObjectURL(audioBlob);
+                    audioPlayback.style.display = 'block';
+                    hasAudioRecorded = true;
+                    status.textContent = '錄音完成！';
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.textContent = '停止錄音';
+                btn.style.background = '#2ed573';
+                status.textContent = '正在錄音中...';
+            } catch (err) {
+                alert('無法存取麥克風，請檢查瀏覽器權限。');
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btn.textContent = '重新錄音';
+            btn.style.background = '#ff4757';
+        }
+    }
+
+    async function submitPrayer(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('prayerSubmitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '傳送中...';
+
+        const payload = {
+            action: "submitPrayer",
+            name: document.getElementById('prayerName').value,
+            phone: document.getElementById('prayerPhone').value,
+            prayerText: document.getElementById('prayerTextContent').value,
+            hasAudio: hasAudioRecorded
+        };
+
+        try {
+            const response = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('🙏 您的代禱請求已順利送出，我們將通知同工與您聯絡！');
+                closePrayerModal();
+            } else {
+                throw new Error();
+            }
+        } catch (err) {
+            alert('❌ 傳送失敗，請檢查網路連線。');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '送出代禱';
+        }
+    }
+
     function getLast7Days() {
         let dates = [];
-        for (let i = 6; i >= 0; i--) {
+        for (let i = 0; i <= 6; i++) {
             let d = new Date();
             d.setDate(d.getDate() - i);
             let year = d.getFullYear();
@@ -338,7 +500,7 @@
         dateBar.innerHTML = '';
         const last7Days = getLast7Days();
 
-        currentDateStr = last7Days[last7Days.length - 1];
+        currentDateStr = last7Days[0];
 
         last7Days.forEach(dateStr => {
             const btn = document.createElement('button');
@@ -368,7 +530,7 @@
         }
 
         if (!selectedRowData) {
-            displayArea.innerHTML = `<div class="no-data">📅 ${dateStr} 目前沒有對應的靈修內容。您可以點擊右上角「加入資料」新增。</div>`;
+            displayArea.innerHTML = `<div class="no-data">📅 ${dateStr} 目前沒有對應的靈修內容。您可以點擊右上角「＋資料」新增。</div>`;
             ytContainer.style.display = 'none';
             return;
         }
@@ -376,7 +538,6 @@
         ytContainer.style.display = 'flex';
         const videoId = extractYouTubeID(selectedRowData.youtube);
         if (videoId) {
-            // 使用帶有 referrerpolicy 的標準 iframe，完全解決 Error 153
             ytWrapper.innerHTML = `
                 <iframe src="https://www.youtube.com/embed/${videoId}" 
                         referrerpolicy="strict-origin-when-cross-origin" 
@@ -410,7 +571,6 @@
         return (match && match[2].length === 11) ? match[2] : null;
     }
 
-    // 溫和女聲 TTS 朗讀
     const synth = window.speechSynthesis;
     let voices = [];
 
@@ -437,24 +597,14 @@
 
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
         let targetVoice = null;
-        // 1. 如果在 Windows，優先尋找 Yating 或 Xiaoxiao
         targetVoice = voices.find(v => v.name.includes('Yating') || v.name.includes('Xiaoxiao'));
-        // 2. 如果在 Apple 裝置，優先尋找 Mei-Jia
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.name.includes('Mei-Jia') || v.name.includes('Meijia'));
-        }
-        // 3. 如果在 Android 手機或其他裝置，鎖定尋找 zh-TW (台灣繁體中文)
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW');
-        }
-        // 4. 最後防線：只要是中文即可
-        if (!targetVoice) {
-            targetVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn'));
-        }
-        if (targetVoice) {
-            utterance.voice = targetVoice;
-        }
-        utterance.rate = 0.55;
+        if (!targetVoice) { targetVoice = voices.find(v => v.name.includes('Mei-Jia') || v.name.includes('Meijia')); }
+        if (!targetVoice) { targetVoice = voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW'); }
+        if (!targetVoice) { targetVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('cmn')); }
+        
+        if (targetVoice) { utterance.voice = targetVoice; }
+
+        utterance.rate = 0.9;
         utterance.pitch = 1.0;
 
         utterance.onstart = () => {
