@@ -252,7 +252,7 @@
 <div id="prayerModal" class="modal">
     <div class="modal-content">
         <h3>🙏 請為我代禱</h3>
-        <p style="font-size: 13px; color: #666; text-align: center;">您可以點擊「開始語音引導填寫」，系統會依序唸出提示並記錄您的回答。</p>
+        <p style="font-size: 13px; color: #666; text-align: center;">點擊下方按鈕開始語音引導，系統會依序提示您回答。</p>
         <form id="prayerForm" onsubmit="submitPrayer(event)">
             <div class="form-group">
                 <label>1. 名字</label>
@@ -378,30 +378,42 @@
         document.getElementById('prayerModal').style.display = 'flex';
     }
 
+    // 🛑 點擊取消或關閉時，強制停止所有語音聆聽與朗讀
     function closePrayerModal() {
         document.getElementById('prayerModal').style.display = 'none';
         document.getElementById('prayerForm').reset();
         document.getElementById('wizardStatus').textContent = '點擊按鈕開始互動問答';
-        if (recognition) {
-            recognition.stop();
+        document.getElementById('wizardBtn').disabled = false;
+        document.getElementById('wizardBtn').textContent = "開始語音引導填寫";
+        
+        currentStep = 0;
+        if (speechTimeout) {
+            clearTimeout(speechTimeout);
         }
         if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
+            window.speechSynthesis.cancel(); // 停止語音朗讀
+        }
+        if (recognition) {
+            try {
+                recognition.stop(); // 停止語音辨識聆聽
+            } catch (e) {}
         }
     }
 
-    // --- 🎙️ 互動式語音導引精靈 (Wizard Flow) ---
+    // --- 🎙️ 互動式語音導引精靈 (附帶防呆超時機制) ---
     let recognition = null;
-    let currentStep = 0; // 0: 未開始, 1: 填名字, 2: 填電話, 3: 填代禱內容
+    let currentStep = 0; 
+    let speechTimeout = null;
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognition = new SpeechRecognition();
         recognition.lang = 'zh-TW';
-        recognition.continuous = false; // 單次回答即結束聆聽
+        recognition.continuous = false;
         recognition.interimResults = false;
 
         recognition.onresult = (event) => {
+            if (speechTimeout) clearTimeout(speechTimeout); // 收到聲音清除超時
             let text = event.results[0][0].transcript.trim();
             
             if (currentStep === 1) {
@@ -423,13 +435,16 @@
         };
 
         recognition.onerror = (event) => {
-            console.error(event.error);
-            document.getElementById('wizardStatus').textContent = "⚠️ 語音辨識發生狀況，請再試一次或手動輸入。";
+            if (speechTimeout) clearTimeout(speechTimeout);
+            console.error('Speech error:', event.error);
+            document.getElementById('wizardStatus').textContent = "⚠️ 沒聽清楚或逾時，請點擊按鈕重新開始。";
             document.getElementById('wizardBtn').disabled = false;
+            document.getElementById('wizardBtn').textContent = "重新語音引導";
+            currentStep = 0;
         };
 
         recognition.onend = () => {
-            // 如果還在問答流程中但沒有抓到聲音，可防呆
+            // 聆聽結束時的防呆處理
         };
     }
 
@@ -443,11 +458,9 @@
         document.getElementById('wizardBtn').disabled = true;
         document.getElementById('wizardBtn').textContent = "正在進行語音引導...";
         
-        // 第一步：提示輸入名字
         speakAndListen("請回答，您的名字是？", "請回答：您的名字");
     }
 
-    // 朗讀提示詞，唸完後自動啟動麥克風聆聽使用者回答
     function speakAndListen(promptText, statusText) {
         document.getElementById('wizardStatus').textContent = "🔊 " + promptText;
         
@@ -462,7 +475,6 @@
         utterance.rate = 1.0;
 
         utterance.onend = () => {
-            // 朗讀完畢後，開啟麥克風聆聽
             setTimeout(() => {
                 startListening();
             }, 300);
@@ -479,6 +491,8 @@
     }
 
     function startListening() {
+        if (currentStep === 0) return;
+
         if (currentStep === 1) {
             document.getElementById('wizardStatus').textContent = "🔴 正在聆聽您的「名字」...";
         } else if (currentStep === 2) {
@@ -489,6 +503,19 @@
 
         try {
             recognition.start();
+            
+            // ⏳ 設定 7 秒超時防呆：如果 7 秒內使用者都沒有說話，自動停止聆聽並提示
+            if (speechTimeout) clearTimeout(speechTimeout);
+            speechTimeout = setTimeout(() => {
+                if (currentStep > 0) {
+                    try { recognition.stop(); } catch (e) {}
+                    document.getElementById('wizardStatus').textContent = "⚠️ 聆聽逾時（沒有偵測到聲音），請重新點擊按鈕。";
+                    document.getElementById('wizardBtn').disabled = false;
+                    document.getElementById('wizardBtn').textContent = "重新語音引導";
+                    currentStep = 0;
+                }
+            }, 7000);
+
         } catch (e) {
             console.error(e);
         }
@@ -655,7 +682,7 @@
         const textToSpeak = `
             聖經經文：${selectedRowData.verse}。
             我們一起禱告：${selectedRowData.prayer}。
-            今日默畫與默想：${selectedRowData.meditation}。
+            今日默想：${selectedRowData.meditation}。
         `;
 
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
