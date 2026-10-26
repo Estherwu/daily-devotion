@@ -172,7 +172,7 @@
             box-sizing: border-box;
             font-size: 14px;
         }
-        .form-group textarea { height: 80px; resize: vertical; }
+        .form-group textarea { height: 90px; resize: vertical; }
         .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
         .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 5px; font-size: 15px; cursor: pointer; font-weight: bold; }
         .btn-save { background-color: #2ed573; color: white; }
@@ -189,7 +189,7 @@
 
 <div class="container">
     <div class="top-btns">
-        <button class="action-top-btn prayer-btn" onclick="openPrayerModal()">🙏 請為我禱告</button>
+        <button class="action-top-btn prayer-btn" onclick="openPrayerModal()">🙏 代禱</button>
         <button class="action-top-btn admin-btn" onclick="checkPassword()">＋ 資料</button>
     </div>
 
@@ -206,7 +206,7 @@
     <div id="displayArea"></div>
 
     <div id="audioSection" class="audio-section" style="display: none;">
-        <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告</button>
+        <button id="speakBtn" class="speak-btn" onclick="toggleSpeech()">🔊 朗讀經文與禱告 (Microsoft Yating)</button>
     </div>
 </div>
 
@@ -248,11 +248,11 @@
     </div>
 </div>
 
-<!-- 訪客：請為我代禱 Modal (包含 名字、電話、代禱內容、語音錄音) -->
+<!-- 訪客：請為我代禱 Modal (語音直接轉文字填入欄位) -->
 <div id="prayerModal" class="modal">
     <div class="modal-content">
         <h3>🙏 請為我代禱</h3>
-        <p style="font-size: 13px; color: #666; text-align: center;">歡迎留下您的名字、電話與代禱需求。</p>
+        <p style="font-size: 13px; color: #666; text-align: center;">您可以點擊下方按鈕開始語音說話，系統會自動將語音轉為文字填入代禱內容中。</p>
         <form id="prayerForm" onsubmit="submitPrayer(event)">
             <div class="form-group">
                 <label>名字</label>
@@ -263,14 +263,13 @@
                 <input type="tel" id="prayerPhone" placeholder="請輸入您的聯絡電話" required>
             </div>
             <div class="form-group">
-                <label>代禱內容</label>
-                <textarea id="prayerTextContent" placeholder="請在此輸入您的代禱需求..." required></textarea>
+                <label>代禱內容 (可手動修改或語音輸入)</label>
+                <textarea id="prayerTextContent" placeholder="請在此輸入或透過語音轉文字填寫代禱需求..." required></textarea>
             </div>
             <div class="form-group" style="background: #f1f2f6; padding: 12px; border-radius: 6px; text-align: center;">
-                <label style="margin-bottom: 8px; font-size: 13px;">🎤 語音錄音留言 (選填)</label>
-                <button type="button" id="recordBtn" onclick="toggleRecording()" style="background:#ff4757; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; font-size:14px;">開始錄音</button>
-                <span id="recordStatus" style="font-size: 12px; margin-left: 8px; color:#555;">未錄音</span>
-                <audio id="audioPlayback" controls style="width:100%; margin-top:10px; display:none;"></audio>
+                <label style="margin-bottom: 8px; font-size: 13px;">🎤 語音轉文字輸入</label>
+                <button type="button" id="sttBtn" onclick="toggleSpeechToText()" style="background:#ff4757; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; font-size:14px;">開始語音輸入</button>
+                <span id="sttStatus" style="font-size: 12px; margin-left: 8px; color:#555;">未開始</span>
             </div>
             <div class="modal-btns">
                 <button type="button" class="btn-cancel" onclick="closePrayerModal()">取消</button>
@@ -382,53 +381,79 @@
     function closePrayerModal() {
         document.getElementById('prayerModal').style.display = 'none';
         document.getElementById('prayerForm').reset();
-        document.getElementById('audioPlayback').style.display = 'none';
-        document.getElementById('recordStatus').textContent = '未錄音';
-        if (isRecording) {
-            mediaRecorder.stop();
-            isRecording = false;
+        document.getElementById('sttStatus').textContent = '未開始';
+        if (recognition && isListening) {
+            recognition.stop();
+            isListening = false;
         }
     }
 
-    let mediaRecorder;
-    let audioChunks = [];
-    let hasAudioRecorded = false;
-    let isRecording = false;
+    // --- 🎤 語音轉文字核心邏輯 (Speech Recognition) ---
+    let recognition = null;
+    let isListening = false;
 
-    async function toggleRecording() {
-        const btn = document.getElementById('recordBtn');
-        const status = document.getElementById('recordStatus');
-        const audioPlayback = document.getElementById('audioPlayback');
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-TW'; // 設定辨識語言為繁體中文
+        recognition.continuous = true; // 持續聆聽
+        recognition.interimResults = true; // 即時顯示辨識結果
 
-        if (!isRecording) {
+        recognition.onresult = (event) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                transcript += event.results[i][0].transcript;
+            }
+            // 自動將辨識到的文字即時填入代禱內容欄位
+            document.getElementById('prayerTextContent').value = transcript;
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error', event.error);
+            document.getElementById('sttStatus').textContent = '辨識發生錯誤，請重試';
+            resetSttButton();
+        };
+
+        recognition.onend = () => {
+            resetSttButton();
+        };
+    }
+
+    function toggleSpeechToText() {
+        if (!recognition) {
+            alert('很抱歉，您的瀏覽器不支援語音辨識功能，請使用 Google Chrome 或手機版瀏覽器。');
+            return;
+        }
+
+        const btn = document.getElementById('sttBtn');
+        const status = document.getElementById('sttStatus');
+
+        if (!isListening) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    audioPlayback.src = URL.createObjectURL(audioBlob);
-                    audioPlayback.style.display = 'block';
-                    hasAudioRecorded = true;
-                    status.textContent = '錄音完成！';
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-                btn.textContent = '停止錄音';
+                recognition.start();
+                isListening = true;
+                btn.textContent = '停止聆聽';
                 btn.style.background = '#2ed573';
-                status.textContent = '正在錄音中...';
+                status.textContent = '🔴 正在聆聽您說話...';
             } catch (err) {
-                alert('無法存取麥克風，請檢查瀏覽器權限。');
+                console.error(err);
             }
         } else {
-            mediaRecorder.stop();
-            isRecording = false;
-            btn.textContent = '重新錄音';
-            btn.style.background = '#ff4757';
+            recognition.stop();
+            isListening = false;
+            resetSttButton();
         }
+    }
+
+    function resetSttButton() {
+        const btn = document.getElementById('sttBtn');
+        const status = document.getElementById('sttStatus');
+        btn.textContent = '開始語音輸入';
+        btn.style.background = '#ff4757';
+        if (status.textContent.includes('正在聆聽')) {
+            status.textContent = '已完成語音輸入';
+        }
+        isListening = false;
     }
 
     async function submitPrayer(e) {
@@ -442,7 +467,7 @@
             name: document.getElementById('prayerName').value,
             phone: document.getElementById('prayerPhone').value,
             prayerText: document.getElementById('prayerTextContent').value,
-            hasAudio: hasAudioRecorded
+            hasAudio: false
         };
 
         try {
@@ -453,7 +478,7 @@
             const result = await response.json();
 
             if (result.status === 'success') {
-                alert('🙏 您的代禱請求已順利送出，我們將通知同工與您聯絡！');
+                alert('🙏 您的代禱請求已順利送出，我們已透過 Gmail 通知管理員！');
                 closePrayerModal();
             } else {
                 throw new Error();
@@ -530,7 +555,7 @@
         }
 
         if (!selectedRowData) {
-            displayArea.innerHTML = `<div class="no-data">📅 ${dateStr} 目前沒有對應的靈修內容。請耐心等待管理員新增資料。</div>`;
+            displayArea.innerHTML = `<div class="no-data">📅 ${dateStr} 目前沒有對應的靈修內容。您可以點擊右上角「＋資料」新增。</div>`;
             ytContainer.style.display = 'none';
             return;
         }
@@ -604,8 +629,8 @@
         
         if (targetVoice) { utterance.voice = targetVoice; }
 
-        utterance.rate = 0.55;
-        utterance.pitch = 0.9;
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
 
         utterance.onstart = () => {
             btn.textContent = '⏹ 停止朗讀';
@@ -619,7 +644,7 @@
 
     function resetSpeakButton() {
         const btn = document.getElementById('speakBtn');
-        btn.textContent = '🔊 朗讀經文與禱告';
+        btn.textContent = '🔊 朗讀經文與禱告 (Microsoft Yating)';
         btn.classList.remove('stop');
     }
 
