@@ -248,28 +248,28 @@
     </div>
 </div>
 
-<!-- 訪客：請為我代禱 Modal (語音直接轉文字填入欄位) -->
+<!-- 訪客：請為我代禱 Modal (互動式語音導引填寫 3 個欄位) -->
 <div id="prayerModal" class="modal">
     <div class="modal-content">
         <h3>🙏 請為我代禱</h3>
-        <p style="font-size: 13px; color: #666; text-align: center;">您可以點擊下方按鈕開始語音說話，系統會自動將語音轉為文字填入代禱內容中。</p>
+        <p style="font-size: 13px; color: #666; text-align: center;">您可以點擊「開始語音引導填寫」，系統會依序唸出提示並記錄您的回答。</p>
         <form id="prayerForm" onsubmit="submitPrayer(event)">
             <div class="form-group">
-                <label>名字</label>
-                <input type="text" id="prayerName" placeholder="請輸入您的名字" required>
+                <label>1. 名字</label>
+                <input type="text" id="prayerName" placeholder="請輸入名字或使用語音引導" required>
             </div>
             <div class="form-group">
-                <label>電話</label>
-                <input type="tel" id="prayerPhone" placeholder="請輸入您的聯絡電話" required>
+                <label>2. 電話</label>
+                <input type="tel" id="prayerPhone" placeholder="請輸入電話或使用語音引導" required>
             </div>
             <div class="form-group">
-                <label>代禱內容 (可手動修改或語音輸入)</label>
-                <textarea id="prayerTextContent" placeholder="請在此輸入或透過語音轉文字填寫代禱需求..." required></textarea>
+                <label>3. 代禱內容</label>
+                <textarea id="prayerTextContent" placeholder="請輸入代禱內容或使用語音引導" required></textarea>
             </div>
             <div class="form-group" style="background: #f1f2f6; padding: 12px; border-radius: 6px; text-align: center;">
-                <label style="margin-bottom: 8px; font-size: 13px;">🎤 語音轉文字輸入</label>
-                <button type="button" id="sttBtn" onclick="toggleSpeechToText()" style="background:#ff4757; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; font-size:14px;">開始語音輸入</button>
-                <span id="sttStatus" style="font-size: 12px; margin-left: 8px; color:#555;">未開始</span>
+                <label style="margin-bottom: 8px; font-size: 13px;">🎙️ 智慧語音引導輸入</label>
+                <button type="button" id="wizardBtn" onclick="startVoiceWizard()" style="background:#ff4757; color:white; border:none; padding:10px 20px; border-radius:20px; cursor:pointer; font-size:14px; font-weight:bold;">開始語音引導填寫</button>
+                <span id="wizardStatus" style="display:block; font-size: 13px; margin-top: 8px; color:#333; font-weight:bold;">點擊按鈕開始互動問答</span>
             </div>
             <div class="modal-btns">
                 <button type="button" class="btn-cancel" onclick="closePrayerModal()">取消</button>
@@ -281,7 +281,7 @@
 
 <script>
     // ⚠️ 請換成你的 Apps Script 部署網址
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyY5zIp1QK8mPszE-ltIRWVax-k5H_OHUQgi6SF4Ack18rOeXH3ZnJHCnsiuK3GN06D/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/你的AppsScript部署網址/exec';
 
     let globalData = [];
     let currentDateStr = '';
@@ -381,79 +381,117 @@
     function closePrayerModal() {
         document.getElementById('prayerModal').style.display = 'none';
         document.getElementById('prayerForm').reset();
-        document.getElementById('sttStatus').textContent = '未開始';
-        if (recognition && isListening) {
+        document.getElementById('wizardStatus').textContent = '點擊按鈕開始互動問答';
+        if (recognition) {
             recognition.stop();
-            isListening = false;
+        }
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
         }
     }
 
-    // --- 🎤 語音轉文字核心邏輯 (Speech Recognition) ---
+    // --- 🎙️ 互動式語音導引精靈 (Wizard Flow) ---
     let recognition = null;
-    let isListening = false;
+    let currentStep = 0; // 0: 未開始, 1: 填名字, 2: 填電話, 3: 填代禱內容
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognition = new SpeechRecognition();
-        recognition.lang = 'zh-TW'; // 設定辨識語言為繁體中文
-        recognition.continuous = true; // 持續聆聽
-        recognition.interimResults = true; // 即時顯示辨識結果
+        recognition.lang = 'zh-TW';
+        recognition.continuous = false; // 單次回答即結束聆聽
+        recognition.interimResults = false;
 
         recognition.onresult = (event) => {
-            let transcript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                transcript += event.results[i][0].transcript;
+            let text = event.results[0][0].transcript.trim();
+            
+            if (currentStep === 1) {
+                document.getElementById('prayerName').value = text;
+                currentStep = 2;
+                speakAndListen("請回答，您的電話號碼是？", "請回答：您的電話號碼");
+            } else if (currentStep === 2) {
+                document.getElementById('prayerPhone').value = text;
+                currentStep = 3;
+                speakAndListen("請回答，您的代禱內容是？", "請回答：您的代禱內容");
+            } else if (currentStep === 3) {
+                document.getElementById('prayerTextContent').value = text;
+                currentStep = 0;
+                document.getElementById('wizardStatus').textContent = "✅ 語音引導填寫完成！您可以檢查內容後送出。";
+                speakText("語音填寫已全部完成，請確認內容後點擊送出代禱。");
+                document.getElementById('wizardBtn').disabled = false;
+                document.getElementById('wizardBtn').textContent = "重新語音引導";
             }
-            // 自動將辨識到的文字即時填入代禱內容欄位
-            document.getElementById('prayerTextContent').value = transcript;
         };
 
         recognition.onerror = (event) => {
-            console.error('Speech recognition error', event.error);
-            document.getElementById('sttStatus').textContent = '辨識發生錯誤，請重試';
-            resetSttButton();
+            console.error(event.error);
+            document.getElementById('wizardStatus').textContent = "⚠️ 語音辨識發生狀況，請再試一次或手動輸入。";
+            document.getElementById('wizardBtn').disabled = false;
         };
 
         recognition.onend = () => {
-            resetSttButton();
+            // 如果還在問答流程中但沒有抓到聲音，可防呆
         };
     }
 
-    function toggleSpeechToText() {
+    function startVoiceWizard() {
         if (!recognition) {
-            alert('很抱歉，您的瀏覽器不支援語音辨識功能，請使用 Google Chrome 或手機版瀏覽器。');
+            alert('很抱歉，您的瀏覽器不支援語音辨識功能，請使用 Google Chrome。');
             return;
         }
 
-        const btn = document.getElementById('sttBtn');
-        const status = document.getElementById('sttStatus');
-
-        if (!isListening) {
-            try {
-                recognition.start();
-                isListening = true;
-                btn.textContent = '停止聆聽';
-                btn.style.background = '#2ed573';
-                status.textContent = '🔴 正在聆聽您說話...';
-            } catch (err) {
-                console.error(err);
-            }
-        } else {
-            recognition.stop();
-            isListening = false;
-            resetSttButton();
-        }
+        currentStep = 1;
+        document.getElementById('wizardBtn').disabled = true;
+        document.getElementById('wizardBtn').textContent = "正在進行語音引導...";
+        
+        // 第一步：提示輸入名字
+        speakAndListen("請回答，您的名字是？", "請回答：您的名字");
     }
 
-    function resetSttButton() {
-        const btn = document.getElementById('sttBtn');
-        const status = document.getElementById('sttStatus');
-        btn.textContent = '開始語音輸入';
-        btn.style.background = '#ff4757';
-        if (status.textContent.includes('正在聆聽')) {
-            status.textContent = '已完成語音輸入';
+    // 朗讀提示詞，唸完後自動啟動麥克風聆聽使用者回答
+    function speakAndListen(promptText, statusText) {
+        document.getElementById('wizardStatus').textContent = "🔊 " + promptText;
+        
+        if (!window.speechSynthesis) {
+            startListening();
+            return;
         }
-        isListening = false;
+
+        window.speechSynthesis.cancel();
+        let utterance = new SpeechSynthesisUtterance(promptText);
+        utterance.lang = 'zh-TW';
+        utterance.rate = 1.0;
+
+        utterance.onend = () => {
+            // 朗讀完畢後，開啟麥克風聆聽
+            setTimeout(() => {
+                startListening();
+            }, 300);
+        };
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function speakText(text) {
+        if (!window.speechSynthesis) return;
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW';
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function startListening() {
+        if (currentStep === 1) {
+            document.getElementById('wizardStatus').textContent = "🔴 正在聆聽您的「名字」...";
+        } else if (currentStep === 2) {
+            document.getElementById('wizardStatus').textContent = "🔴 正在聆聽您的「電話」...";
+        } else if (currentStep === 3) {
+            document.getElementById('wizardStatus').textContent = "🔴 正在聆聽您的「代禱內容」...";
+        }
+
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     async function submitPrayer(e) {
@@ -617,7 +655,7 @@
         const textToSpeak = `
             聖經經文：${selectedRowData.verse}。
             我們一起禱告：${selectedRowData.prayer}。
-            今日默想：${selectedRowData.meditation}。
+            今日默畫與默想：${selectedRowData.meditation}。
         `;
 
         const utterance = new SpeechSynthesisUtterance(textToSpeak);
